@@ -112,10 +112,10 @@ public final class Utils {
         for (File f : files) {
             if (f.isDirectory()) {
                 freed += wipeDir(f);
-                f.delete();
+                f.delete(); // remove o diretorio ja esvaziado (ignora se ainda em uso)
             } else {
-                freed += f.length();
-                f.delete();
+                long len = f.length();
+                if (f.delete()) freed += len; // so conta como liberado se realmente apagou
             }
         }
         return freed;

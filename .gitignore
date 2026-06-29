@@ -1,0 +1,22 @@
+# Build artifacts
+out/
+*.class
+TrashCleaner.jar
+
+# Session logs (contem fingerprint da maquina: CPU/GPU/BIOS/discos)
+TrashCleaner_*.log
+*.log
+
+# Relatorios gerados
+*_report.html
+TrashCleaner_report*.html
+
+# Temporarios do launcher
+_tc_run.vbs
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+Thumbs.db
+desktop.ini
