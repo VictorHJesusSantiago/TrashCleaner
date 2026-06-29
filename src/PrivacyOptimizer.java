@@ -14,9 +14,9 @@ public final class PrivacyOptimizer {
         log.section("PRIVACIDADE E TELEMETRIA");
 
         log.info("Desabilitando telemetria do Windows...");
-        Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection",
+        RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection",
             "AllowTelemetry", "REG_DWORD", "0");
-        Utils.reg("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\DataCollection",
+        RegistryUtils.reg("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\DataCollection",
             "AllowTelemetry", "REG_DWORD", "0");
         // Parar e desabilitar servico de telemetria
         Utils.exec("sc", "config", "DiagTrack",         "start=", "disabled");
@@ -30,19 +30,19 @@ public final class PrivacyOptimizer {
         log.ok("Telemetria desabilitada.");
 
         log.info("Desabilitando feedback automatico do Windows...");
-        Utils.reg("HKCU\\Software\\Microsoft\\Siuf\\Rules",
+        RegistryUtils.reg("HKCU\\Software\\Microsoft\\Siuf\\Rules",
             "NumberOfSIUFInPeriod", "REG_DWORD", "0");
-        Utils.reg("HKCU\\Software\\Microsoft\\Siuf\\Rules",
+        RegistryUtils.reg("HKCU\\Software\\Microsoft\\Siuf\\Rules",
             "PeriodInNanoSeconds", "REG_DWORD", "0");
-        Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection",
+        RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection",
             "DoNotShowFeedbackNotifications", "REG_DWORD", "1");
         log.ok("Feedback automatico desabilitado.");
 
         if (si.isWin10Plus()) {
             log.info("Desabilitando ID de Publicidade (AdvertisingInfo)...");
-            Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo",
+            RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo",
                 "Enabled", "REG_DWORD", "0");
-            Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\AdvertisingInfo",
+            RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\AdvertisingInfo",
                 "DisabledByGroupPolicy", "REG_DWORD", "1");
             log.ok("ID de Publicidade desabilitado.");
 
@@ -50,44 +50,44 @@ public final class PrivacyOptimizer {
             Utils.exec("reg", "add",
                 "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\location",
                 "/v", "Value", "/t", "REG_SZ", "/d", "Deny", "/f");
-            Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\LocationAndSensors",
+            RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\LocationAndSensors",
                 "DisableLocation", "REG_DWORD", "1");
             log.ok("Localizacao desabilitada.");
 
             log.info("Desabilitando Cortana e pesquisa Bing...");
-            Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search",
+            RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search",
                 "AllowCortana", "REG_DWORD", "0");
-            Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search",
+            RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search",
                 "DisableWebSearch", "REG_DWORD", "1");
-            Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search",
+            RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search",
                 "ConnectedSearchUseWeb", "REG_DWORD", "0");
-            Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Search",
+            RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Search",
                 "BingSearchEnabled", "REG_DWORD", "0");
-            Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Search",
+            RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Search",
                 "CortanaConsent", "REG_DWORD", "0");
             log.ok("Cortana e pesquisa Bing desabilitados.");
 
             log.info("Desabilitando sugestoes e apps promovidos no menu Iniciar...");
             String cdm = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager";
-            Utils.reg(cdm, "SystemPaneSuggestionsEnabled",       "REG_DWORD", "0");
-            Utils.reg(cdm, "SubscribedContent-338388Enabled",    "REG_DWORD", "0");
-            Utils.reg(cdm, "SubscribedContent-338389Enabled",    "REG_DWORD", "0");
-            Utils.reg(cdm, "SubscribedContent-353694Enabled",    "REG_DWORD", "0");
-            Utils.reg(cdm, "SubscribedContent-353696Enabled",    "REG_DWORD", "0");
-            Utils.reg(cdm, "RotatingLockScreenEnabled",          "REG_DWORD", "0");
-            Utils.reg(cdm, "SilentInstalledAppsEnabled",         "REG_DWORD", "0");
-            Utils.reg(cdm, "SoftLandingEnabled",                 "REG_DWORD", "0");
+            RegistryUtils.reg(cdm, "SystemPaneSuggestionsEnabled",       "REG_DWORD", "0");
+            RegistryUtils.reg(cdm, "SubscribedContent-338388Enabled",    "REG_DWORD", "0");
+            RegistryUtils.reg(cdm, "SubscribedContent-338389Enabled",    "REG_DWORD", "0");
+            RegistryUtils.reg(cdm, "SubscribedContent-353694Enabled",    "REG_DWORD", "0");
+            RegistryUtils.reg(cdm, "SubscribedContent-353696Enabled",    "REG_DWORD", "0");
+            RegistryUtils.reg(cdm, "RotatingLockScreenEnabled",          "REG_DWORD", "0");
+            RegistryUtils.reg(cdm, "SilentInstalledAppsEnabled",         "REG_DWORD", "0");
+            RegistryUtils.reg(cdm, "SoftLandingEnabled",                 "REG_DWORD", "0");
             log.ok("Sugestoes e apps promovidos desabilitados.");
 
             log.info("Desabilitando Otimizacao de Entrega (atualizacoes P2P)...");
-            Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization",
+            RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\DeliveryOptimization",
                 "DODownloadMode", "REG_DWORD", "0");
             log.ok("Delivery Optimization (P2P) desabilitado.");
 
             log.info("Desabilitando coleta de dados de diagnostico de apps...");
-            Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Privacy",
+            RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Privacy",
                 "TailoredExperiencesWithDiagnosticDataEnabled", "REG_DWORD", "0");
-            Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\AppCompat",
+            RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\AppCompat",
                 "DisableInventory", "REG_DWORD", "1");
             log.ok("Coleta de diagnostico de apps desabilitada.");
 
@@ -112,39 +112,39 @@ public final class PrivacyOptimizer {
         log.section("TWEAKS DE PERFORMANCE");
 
         log.info("Desabilitando Xbox Game Bar e Game DVR...");
-        Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\GameDVR",
+        RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\GameDVR",
             "AppCaptureEnabled", "REG_DWORD", "0");
-        Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR",
+        RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\GameDVR",
             "AllowGameDVR", "REG_DWORD", "0");
-        Utils.reg("HKCU\\System\\GameConfigStore",
+        RegistryUtils.reg("HKCU\\System\\GameConfigStore",
             "GameDVR_Enabled", "REG_DWORD", "0");
-        Utils.reg("HKCU\\System\\GameConfigStore",
+        RegistryUtils.reg("HKCU\\System\\GameConfigStore",
             "GameDVR_FSEBehaviorMode", "REG_DWORD", "2");
         log.ok("Game Bar e DVR desabilitados.");
 
         log.info("Desabilitando transparencia de janelas...");
-        Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
+        RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize",
             "EnableTransparency", "REG_DWORD", "0");
         log.ok("Transparencia desabilitada.");
 
         log.info("Desabilitando Autoplay...");
-        Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\AutoplayHandlers",
+        RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\AutoplayHandlers",
             "DisableAutoplay", "REG_DWORD", "1");
-        Utils.reg("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer",
+        RegistryUtils.reg("HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer",
             "NoDriveTypeAutoRun", "REG_DWORD", "255");
         log.ok("Autoplay desabilitado.");
 
         log.info("Otimizando carregamento de DLLs em RAM...");
-        Utils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
+        RegistryUtils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
             "LargeSystemCache", "REG_DWORD", "0");
         // Aumentar cache de I/O nao paginavel
-        Utils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
+        RegistryUtils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
             "IoPageLockLimit", "REG_DWORD", "983040");
         log.ok("Carregamento de DLLs otimizado.");
 
         log.info("Desabilitando indexacao de conteudo em discos...");
         // Nao desabilitar servico (quebraria pesquisa), apenas reduzir impacto
-        Utils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search",
+        RegistryUtils.reg("HKLM\\SOFTWARE\\Policies\\Microsoft\\Windows\\Windows Search",
             "PreventIndexingLowDiskSpaceMB", "REG_DWORD", "2000");
         log.ok("Indexacao otimizada.");
 
@@ -164,19 +164,19 @@ public final class PrivacyOptimizer {
             }
 
             log.info("Desabilitando apps em background...");
-            Utils.reg(
+            RegistryUtils.reg(
                 "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\BackgroundAccessApplications",
                 "GlobalUserDisabled", "REG_DWORD", "1");
             log.ok("Apps em background desabilitados.");
 
             log.info("Desabilitando animacoes de tela de bloqueio e Spotlight...");
             String cdm = "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager";
-            Utils.reg(cdm, "RotatingLockScreenEnabled",    "REG_DWORD", "0");
-            Utils.reg(cdm, "RotatingLockScreenOverlayEnabled", "REG_DWORD", "0");
+            RegistryUtils.reg(cdm, "RotatingLockScreenEnabled",    "REG_DWORD", "0");
+            RegistryUtils.reg(cdm, "RotatingLockScreenOverlayEnabled", "REG_DWORD", "0");
             log.ok("Animacoes de tela de bloqueio desabilitadas.");
 
             log.info("Desabilitando notificacoes de sugestoes do Windows...");
-            Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings\\Windows.SystemToast.Suggested",
+            RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Notifications\\Settings\\Windows.SystemToast.Suggested",
                 "Enabled", "REG_DWORD", "0");
             log.ok("Sugestoes de notificacao desabilitadas.");
         }

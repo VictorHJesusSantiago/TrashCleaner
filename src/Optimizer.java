@@ -17,13 +17,13 @@ public final class Optimizer {
 
         log.info("Efeitos visuais para desempenho...");
         log.progress("Efeitos visuais", 10);
-        Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects",
+        RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\VisualEffects",
             "VisualFXSetting", "REG_DWORD", "3");
-        Utils.reg("HKCU\\Control Panel\\Desktop\\WindowMetrics", "MinAnimate", "REG_SZ", "0");
-        Utils.reg("HKCU\\Control Panel\\Desktop", "MenuShowDelay", "REG_SZ", "0");
-        Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
+        RegistryUtils.reg("HKCU\\Control Panel\\Desktop\\WindowMetrics", "MinAnimate", "REG_SZ", "0");
+        RegistryUtils.reg("HKCU\\Control Panel\\Desktop", "MenuShowDelay", "REG_SZ", "0");
+        RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced",
             "TaskbarAnimations", "REG_DWORD", "0");
-        Utils.reg("HKCU\\Software\\Microsoft\\Windows\\DWM", "AnimationsShiftKey", "REG_DWORD", "0");
+        RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\DWM", "AnimationsShiftKey", "REG_DWORD", "0");
         log.ok("Efeitos visuais otimizados.");
 
         log.info("Plano de energia Alto Desempenho...");
@@ -34,24 +34,24 @@ public final class Optimizer {
 
         log.info("Gerenciamento de memoria (kernel na RAM)...");
         log.progress("Memoria kernel", 26);
-        Utils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
+        RegistryUtils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
             "DisablePagingExecutive", "REG_DWORD", "1");
         log.ok("Memoria otimizada.");
 
         log.info("Prioridade de CPU para processos em primeiro plano...");
         log.progress("Prioridade CPU", 34);
-        Utils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl",
+        RegistryUtils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\PriorityControl",
             "Win32PrioritySeparation", "REG_DWORD", "26");
         log.ok("Prioridade CPU otimizada.");
 
         log.info("Historicos e MRU do Explorer...");
         log.progress("MRU / historicos", 42);
-        Utils.regDelete("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU");
-        Utils.regDelete("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths");
-        Utils.regDelete("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs");
-        Utils.regDelete(
+        RegistryUtils.regDelete("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RunMRU");
+        RegistryUtils.regDelete("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\TypedPaths");
+        RegistryUtils.regDelete("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\RecentDocs");
+        RegistryUtils.regDelete(
             "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\LastVisitedPidlMRU");
-        Utils.regDelete(
+        RegistryUtils.regDelete(
             "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\ComDlg32\\OpenSavePidlMRU");
         Utils.wipeDir(new File(si.appData + "\\Microsoft\\Windows\\Recent"));
         log.ok("Historicos MRU limpos.");
@@ -126,16 +126,16 @@ public final class Optimizer {
 
         log.info("Cliente DNS local...");
         log.progress("DNS client", 82);
-        Utils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Parameters",
+        RegistryUtils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Parameters",
             "MaxCacheEntryTtlLimit", "REG_DWORD", "86400");
-        Utils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Parameters",
+        RegistryUtils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Services\\Dnscache\\Parameters",
             "CacheHashTableSize", "REG_DWORD", "256");
         log.ok("DNS client otimizado.");
 
         log.info("Redefinindo configuracao de proxy...");
         log.progress("Proxy reset", 88);
         Utils.exec("netsh", "winhttp", "reset", "proxy");
-        Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
+        RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
             "ProxyEnable", "REG_DWORD", "0");
         log.ok("Proxy redefinido.");
 
@@ -278,7 +278,7 @@ public final class Optimizer {
 
         // Habilitar via politica de registro (se aplicavel)
         log.info("Configurando politica de write-cache do sistema...");
-        Utils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
+        RegistryUtils.reg("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Memory Management",
             "LargeSystemCache", "REG_DWORD", "0");
         log.ok("Write-caching verificado/otimizado. Reinicie para aplicar.");
     }
@@ -306,7 +306,7 @@ public final class Optimizer {
         if (sdBak.exists())  { Utils.wipeDir(sdBak);  sdBak.delete(); }
         if (cr2Bak.exists()) { Utils.wipeDir(cr2Bak); cr2Bak.delete(); }
 
-        if (!Config.dryRun) {
+        if (!Config.isDryRun()) {
             if (sd.exists())  sd.renameTo(sdBak);
             if (cr2.exists()) cr2.renameTo(cr2Bak);
         } else {
