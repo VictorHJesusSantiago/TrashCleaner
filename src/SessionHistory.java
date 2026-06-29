@@ -43,7 +43,7 @@ public final class SessionHistory {
 
         log.println("");
 
-        if (Config.silent || sc == null) return;
+        if (Config.isSilent() || sc == null) return;
 
         log.println("  [A] Abrir log no Notepad    [X] Exportar para HTML");
         log.println("  [D] Deletar log selecionado [C] Deletar TODOS os logs");

@@ -36,7 +36,7 @@ public final class SecurityTools {
         log.println("  [5] Bloquear programa pelo caminho");
         log.println("  [0] Voltar");
 
-        if (Config.silent || sc == null) {
+        if (Config.isSilent() || sc == null) {
             log.println("  (Modo silencioso - sem alteracoes)");
             return;
         }
@@ -130,7 +130,7 @@ public final class SecurityTools {
         log.println("  [2] Remover TODAS as credenciais");
         log.println("  [0] Voltar");
 
-        if (Config.silent || sc == null) {
+        if (Config.isSilent() || sc == null) {
             log.println("  (Modo silencioso - sem alteracoes)");
             return;
         }

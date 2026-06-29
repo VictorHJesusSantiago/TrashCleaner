@@ -18,12 +18,12 @@ public final class ReportGenerator {
         String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String path  = outputDir + "TrashCleaner_Report_" + stamp + ".html";
 
-        long diskBefore  = Config.sessionStartFree;
-        long diskAfter   = Config.sessionEndFree;
-        long ramBefore   = Config.sessionStartRam;
-        long ramAfter    = Config.sessionEndRam;
+        long diskBefore  = Config.getSessionStartFree();
+        long diskAfter   = Config.getSessionEndFree();
+        long ramBefore   = Config.getSessionStartRam();
+        long ramAfter    = Config.getSessionEndRam();
         long elapsed     = Config.elapsedSeconds();
-        List<String> ops = new ArrayList<>(Config.sessionOps);
+        List<String> ops = new ArrayList<>(Config.getSessionOps());
 
         try (PrintWriter pw = new PrintWriter(new BufferedWriter(
             new OutputStreamWriter(new FileOutputStream(path), "UTF-8")))) {
