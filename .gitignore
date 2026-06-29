@@ -5,7 +5,9 @@ TrashCleaner.jar
 
 # Session logs (contem fingerprint da maquina: CPU/GPU/BIOS/discos)
 TrashCleaner_*.log
+TrashCleaner_*.jsonl
 *.log
+*.jsonl
 
 # Relatorios gerados
 *_report.html

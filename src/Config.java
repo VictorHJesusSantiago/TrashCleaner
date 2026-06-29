@@ -1,35 +1,52 @@
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
  * Configuracoes globais da sessao.
- * Acesso estatico universal sem injecao de dependencia.
+ * Campos privados com acessores estaticos: mutacao controlada, sem acesso direto externo.
  */
 public final class Config {
 
     private Config() {}
 
-    // --- Modos de execucao ---
+    // --- Flags de execucao (definidas uma unica vez na inicializacao) ---
 
-    /** Quando true: nenhuma operacao e executada, apenas exibida no console. */
-    public static boolean dryRun   = false;
+    private static boolean dryRun      = false;
+    private static boolean silent      = false;
+    private static boolean showProgress = true;
 
-    /** Quando true: sem prompts interativos; opera sem esperar input do usuario. */
-    public static boolean silent   = false;
+    public static boolean isDryRun()        { return dryRun; }
+    public static boolean isSilent()        { return silent; }
+    public static boolean isShowProgress()  { return showProgress; }
 
-    /** Exibir barra de progresso inline (sobrescreve a mesma linha via \r). */
-    public static boolean showProgress = true;
+    public static void setDryRun(boolean v)       { dryRun = v; }
+    public static void setSilent(boolean v)        { silent = v; }
+    public static void setShowProgress(boolean v)  { showProgress = v; }
 
-    // --- Estatisticas de sessao (para relatorio antes/depois) ---
+    // --- Estatisticas de sessao (gerenciadas via startSession/endSession) ---
 
-    public static long   sessionStartFree  = 0L;
-    public static long   sessionStartRam   = 0L;
-    public static long   sessionStartTime  = 0L;
-    public static long   sessionEndFree    = 0L;
-    public static long   sessionEndRam     = 0L;
+    private static long sessionStartFree = 0L;
+    private static long sessionStartRam  = 0L;
+    private static long sessionStartTime = 0L;
+    private static long sessionEndFree   = 0L;
+    private static long sessionEndRam    = 0L;
 
-    /** Lista de operacoes realizadas na sessao (para ReportGenerator). */
-    public static final List<String> sessionOps = new ArrayList<>();
+    public static long getSessionStartFree() { return sessionStartFree; }
+    public static long getSessionStartRam()  { return sessionStartRam; }
+    public static long getSessionEndFree()   { return sessionEndFree; }
+    public static long getSessionEndRam()    { return sessionEndRam; }
+
+    // --- Operacoes da sessao ---
+
+    private static final List<String> sessionOps = new ArrayList<>();
+
+    /** Retorna copia imutavel da lista de operacoes realizadas na sessao. */
+    public static List<String> getSessionOps() {
+        return Collections.unmodifiableList(sessionOps);
+    }
+
+    public static int sessionOpCount() { return sessionOps.size(); }
 
     public static void startSession(long diskFree, long ramFree) {
         sessionStartFree = diskFree;
@@ -43,9 +60,7 @@ public final class Config {
         sessionEndRam  = ramFree;
     }
 
-    public static void addOp(String desc) {
-        sessionOps.add(desc);
-    }
+    public static void addOp(String desc) { sessionOps.add(desc); }
 
     public static long elapsedSeconds() {
         if (sessionStartTime == 0) return 0L;

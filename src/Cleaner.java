@@ -51,7 +51,7 @@ public final class Cleaner {
 
         log.info("Historico de busca do Windows (WordWheelQuery)...");
         log.progress("Busca Windows", 82);
-        Utils.regDelete("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery");
+        RegistryUtils.regDelete("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery");
         log.ok("Historico de busca limpo.");
 
         log.info("Cache DNS...");
@@ -82,7 +82,7 @@ public final class Cleaner {
         Utils.wipeDir(new File(si.userProfile  + "\\Local Settings\\Temporary Internet Files"));
         Utils.deleteGlob(new File(si.localAppData + "\\Microsoft\\Windows\\Explorer"), "thumbcache_*.db");
         Utils.exec("ipconfig", "/flushdns");
-        Utils.regDelete("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery");
+        RegistryUtils.regDelete("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\WordWheelQuery");
         log.ok("Limpeza basica concluida.");
 
         log.info("Prefetch do Windows...");
@@ -496,7 +496,7 @@ public final class Cleaner {
                 line = line.trim();
                 if (line.startsWith("HKEY") && line.contains("S-1-5-21-")) {
                     // Ler ProfileImagePath
-                    String path = Utils.regQuery(line, "ProfileImagePath");
+                    String path = RegistryUtils.regQuery(line, "ProfileImagePath");
                     if (path != null && !path.isEmpty()) {
                         File profileDir = new File(path);
                         long size = Utils.calcDirSize(profileDir);
