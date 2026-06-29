@@ -1,6 +1,9 @@
 import java.io.*;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Scanner;
 
 /**
@@ -118,6 +121,223 @@ public final class TrashCleaner {
 
     static final String VERSION = "2.0";
 
+    // ---------------------------------------------------------------
+    // CLI: contexto do iterador de argumentos
+    // ---------------------------------------------------------------
+
+    /** Encapsula a iteracao sobre o array de argumentos CLI. */
+    static final class CliContext {
+        final String[]   args;
+        int              pos;   // indice corrente no array
+        final SystemInfo si;
+        final Logger     log;
+
+        CliContext(String[] args, SystemInfo si, Logger log) {
+            this.args = args; this.si = si; this.log = log; this.pos = -1;
+        }
+
+        boolean hasNext() { return pos + 1 < args.length; }
+        String  next()    { return args[++pos]; }
+
+        private String peek() { return pos + 1 < args.length ? args[pos + 1] : null; }
+
+        /** Consome e retorna o proximo arg se nao for uma flag (nao comeca com '-'). */
+        String nextArg() {
+            String n = peek();
+            return (n != null && !n.startsWith("-")) ? args[++pos] : null;
+        }
+
+        String nextArgOr(String def) { String v = nextArg(); return v != null ? v : def; }
+
+        /** Consome o proximo arg apenas se ele combinar com o regex informado. */
+        String nextArgMatching(String regex) {
+            String n = peek();
+            return (n != null && n.matches(regex)) ? args[++pos] : null;
+        }
+
+        /** Consome o proximo arg incondicionalmente (inclusive flags). */
+        String nextArgAny(String def) {
+            return pos + 1 < args.length ? args[++pos] : def;
+        }
+    }
+
+    @FunctionalInterface
+    interface CliHandler { void handle(CliContext ctx); }
+
+    // ---------------------------------------------------------------
+    // CLI: mapa de comandos (substitui o switch gigante em runCLI)
+    // ---------------------------------------------------------------
+
+    private static final Map<String, CliHandler> CLI_COMMANDS = buildCliCommands();
+
+    private static Map<String, CliHandler> buildCliCommands() {
+        Map<String, CliHandler> m = new LinkedHashMap<>();
+
+        // --- LIMPEZA ---
+        CliHandler quickClean = ctx -> Cleaner.quickClean(ctx.si, ctx.log);
+        m.put("--quick", quickClean); m.put("-q", quickClean);
+
+        CliHandler deepClean = ctx -> Cleaner.deepClean(ctx.si, ctx.log);
+        m.put("--deep", deepClean);   m.put("-d", deepClean);
+
+        m.put("--apps",        ctx -> Cleaner.cleanAppCache(ctx.si, ctx.log));
+        m.put("--shadows-old", ctx -> Cleaner.cleanShadowCopies(ctx.si, ctx.log));
+        m.put("--shadows-all", ctx -> DiskAnalyzer.deleteShadowCopies(ctx.si, ctx.log, false));
+        m.put("--winsxs",      ctx -> Cleaner.cleanWinSxS(ctx.si, ctx.log));
+        m.put("--lang-packs",  ctx -> Cleaner.cleanLanguagePacks(ctx.si, ctx.log));
+
+        CliHandler allClean = ctx -> {
+            Cleaner.deepClean(ctx.si, ctx.log);
+            Cleaner.cleanAppCache(ctx.si, ctx.log);
+            Optimizer.optimizeSystem(ctx.si, ctx.log);
+            Optimizer.optimizeNetwork(ctx.si, ctx.log);
+            PrivacyOptimizer.applyAll(ctx.si, ctx.log);
+        };
+        m.put("--all", allClean); m.put("-a", allClean);
+
+        // --- OTIMIZACAO ---
+        CliHandler optimizeSys = ctx -> Optimizer.optimizeSystem(ctx.si, ctx.log);
+        m.put("--optimize", optimizeSys); m.put("-s", optimizeSys);
+
+        CliHandler optimizeNet = ctx -> Optimizer.optimizeNetwork(ctx.si, ctx.log);
+        m.put("--network", optimizeNet);  m.put("-n", optimizeNet);
+
+        m.put("--privacy",         ctx -> PrivacyOptimizer.applyPrivacy(ctx.si, ctx.log));
+        m.put("--performance",     ctx -> PrivacyOptimizer.applyPerformance(ctx.si, ctx.log));
+        m.put("--tweaks",          ctx -> PrivacyOptimizer.applyAll(ctx.si, ctx.log));
+        m.put("--sounds-off",      ctx -> Optimizer.disableSystemSounds(ctx.log));
+        m.put("--search-rebuild",  ctx -> Optimizer.rebuildSearchIndex(ctx.si, ctx.log));
+        m.put("--write-cache",     ctx -> Optimizer.optimizeWriteCache(ctx.si, ctx.log));
+        m.put("--winupdate-repair",ctx -> Optimizer.repairWindowsUpdate(ctx.si, ctx.log));
+        m.put("--dotnet-repair",   ctx -> Optimizer.repairDotNet(ctx.si, ctx.log));
+        m.put("--pagefile-auto",   ctx -> Optimizer.configurePagefile(ctx.si, ctx.log, "auto", 0, 0));
+        m.put("--pagefile-off",    ctx -> Optimizer.configurePagefile(ctx.si, ctx.log, "off", 0, 0));
+        m.put("--pagefile-custom", ctx -> {
+            long minMb = 1024, maxMb = 4096;
+            String spec = ctx.nextArgMatching(".*,.*");
+            if (spec != null) {
+                String[] mm = spec.split(",");
+                try { minMb = Long.parseLong(mm[0].trim()); } catch (Exception ignored) {}
+                try { maxMb = Long.parseLong(mm[1].trim()); } catch (Exception ignored) {}
+            }
+            Optimizer.configurePagefile(ctx.si, ctx.log, "custom", minMb, maxMb);
+        });
+
+        // --- SISTEMA ---
+        CliHandler checkSys = ctx -> SystemChecker.check(ctx.si, ctx.log);
+        m.put("--check", checkSys); m.put("-c", checkSys);
+
+        CliHandler showInfo = ctx -> SystemInfoDisplay.show(ctx.si, ctx.log);
+        m.put("--info", showInfo);  m.put("-i", showInfo);
+
+        m.put("--programs",         ctx -> SystemInfoDisplay.showPrograms(ctx.si, ctx.log));
+        m.put("--drivers",          ctx -> SystemInfoDisplay.showDrivers(ctx.si, ctx.log));
+        m.put("--updates",          ctx -> SystemInfoDisplay.showUpdates(ctx.si, ctx.log));
+        m.put("--startup",          ctx -> StartupManager.listStartup(ctx.si, ctx.log));
+        m.put("--services",         ctx -> ServiceManager.listServices(ctx.log, ""));
+        m.put("--services-gaming",  ctx -> ServiceManager.applyGamingProfile(ctx.log));
+        m.put("--services-min",     ctx -> ServiceManager.applyMinimalProfile(ctx.log));
+        m.put("--services-restart", ctx -> ServiceManager.restartCritical(ctx.log));
+        m.put("--tasks-list",       ctx -> ScheduledTaskManager.listTasks(ctx.log, "telemetry"));
+        m.put("--tasks-disable",    ctx -> ScheduledTaskManager.disableTelemetryTasks(ctx.log));
+        m.put("--tasks-enable",     ctx -> ScheduledTaskManager.enableTelemetryTasks(ctx.log));
+        m.put("--boot-diag",        ctx -> ScheduledTaskManager.bootDiagnostic(ctx.si, ctx.log));
+
+        // --- DISCO ---
+        m.put("--disk-health", ctx -> SystemTools.checkDiskHealth(ctx.si, ctx.log));
+        m.put("--disk-top", ctx -> {
+            String n = ctx.nextArgMatching("\\d+");
+            DiskAnalyzer.topFolders(ctx.log, ctx.si.systemDrive, n != null ? Integer.parseInt(n) : 20);
+        });
+        m.put("--disk-large", ctx -> {
+            String mb = ctx.nextArgMatching("\\d+");
+            DiskAnalyzer.findLargeFiles(ctx.log, ctx.si.systemDrive, mb != null ? Long.parseLong(mb) : 100, 50);
+        });
+        m.put("--disk-dupes", ctx -> {
+            DiskAnalyzer.findDuplicates(ctx.log, ctx.nextArgOr(ctx.si.userProfile));
+        });
+        m.put("--disk-frag", ctx -> {
+            String d = ctx.nextArgMatching("[A-Za-z]:");
+            DiskAnalyzer.checkFragmentation(ctx.si, ctx.log, d != null ? d : ctx.si.systemDrive);
+        });
+        m.put("--chkdsk", ctx -> {
+            String d = ctx.nextArgMatching("[A-Za-z]:");
+            DiskAnalyzer.scheduleChkdsk(ctx.log, d != null ? d : ctx.si.systemDrive);
+        });
+        m.put("--shadows-list",    ctx -> DiskAnalyzer.listShadowCopies(ctx.si, ctx.log));
+        m.put("--ntfs-compress",   ctx -> DiskAnalyzer.compressFolder(ctx.log, ctx.nextArgOr(ctx.si.userProfile)));
+        m.put("--backup", ctx -> {
+            String src = ctx.nextArgAny(ctx.si.userProfile);
+            String dst = ctx.nextArgAny(getJarDir() + "backup\\");
+            DiskAnalyzer.backupFiles(ctx.log, new String[]{src}, dst);
+        });
+
+        // --- REDE ---
+        m.put("--net-test",        ctx -> NetworkTools.testConnectivity(ctx.log));
+        m.put("--net-connections", ctx -> NetworkTools.listConnections(ctx.log));
+        m.put("--net-ports",       ctx -> NetworkTools.listOpenPorts(ctx.log));
+        m.put("--net-dns-set",     ctx -> NetworkTools.configureDns(ctx.si, ctx.log, ctx.nextArgOr("cloudflare")));
+        m.put("--net-wifi",        ctx -> NetworkTools.manageWifiProfiles(ctx.log, null));
+        m.put("--net-adapters",    ctx -> NetworkTools.manageAdapters(ctx.log, null));
+        m.put("--net-proxy-reset", ctx -> NetworkTools.resetProxy(ctx.log));
+        m.put("--net-trace",       ctx -> NetworkTools.traceroute(ctx.log, ctx.nextArgOr("google.com")));
+        m.put("--net-info",        ctx -> NetworkTools.showNetInfo(ctx.log));
+
+        // --- SEGURANCA ---
+        m.put("--firewall",      ctx -> SecurityTools.manageFirewall(ctx.si, ctx.log, null));
+        m.put("--defender-scan", ctx -> SecurityTools.defenderScan(ctx.si, ctx.log));
+        m.put("--credentials",   ctx -> SecurityTools.manageCredentials(ctx.log, null));
+        m.put("--users",         ctx -> SecurityTools.listUsers(ctx.log));
+        m.put("--check-updates", ctx -> SecurityTools.checkUpdates(ctx.si, ctx.log));
+        m.put("--bsod-history",  ctx -> SecurityTools.showBsodHistory(ctx.si, ctx.log));
+        m.put("--processes",     ctx -> SecurityTools.listProcesses(ctx.si, ctx.log));
+        m.put("--secure-boot",   ctx -> SecurityTools.checkSecureBoot(ctx.si, ctx.log));
+        m.put("--driver-check",  ctx -> SecurityTools.checkDrivers(ctx.si, ctx.log));
+
+        // --- RECUPERACAO ---
+        m.put("--restore-list",  ctx -> RecoveryTools.listRestorePoints(ctx.si, ctx.log));
+        m.put("--restore-point", ctx -> SystemTools.createRestorePoint(ctx.si, ctx.log));
+        m.put("--restore-apply", ctx -> {
+            String n = ctx.nextArgMatching("\\d+");
+            RecoveryTools.applyRestorePoint(ctx.si, ctx.log, n != null ? Integer.parseInt(n) : 1);
+        });
+        m.put("--mbr-repair", ctx -> RecoveryTools.repairBoot(ctx.si, ctx.log, ctx.nextArgOr("all")));
+        m.put("--perms",      ctx -> RecoveryTools.repairPermissions(ctx.si, ctx.log, ctx.nextArg()));
+        m.put("--file-assoc", ctx -> RecoveryTools.repairFileAssociations(ctx.si, ctx.log));
+        m.put("--dotnet-check",ctx -> RecoveryTools.checkDotNet(ctx.si, ctx.log));
+
+        // --- FERRAMENTAS ---
+        m.put("--ram",           ctx -> SystemTools.flushRam(ctx.si, ctx.log));
+        m.put("--battery",       ctx -> SystemTools.batteryReport(ctx.log, getJarDir()));
+        m.put("--clipboard",     ctx -> SystemTools.clearClipboard(ctx.si, ctx.log));
+        m.put("--hibernate-on",  ctx -> SystemTools.setHibernation(ctx.log, true));
+        m.put("--hibernate-off", ctx -> SystemTools.setHibernation(ctx.log, false));
+        m.put("--reg-check",     ctx -> SystemTools.checkRegistry(ctx.si, ctx.log));
+
+        // --- RELATORIOS / AUTOMACAO ---
+        m.put("--report-html", ctx -> {
+            Config.endSession(Utils.getDiskFree(ctx.si.systemDrive), getAvailableRam(ctx.si));
+            String html = ReportGenerator.generate(ctx.si, ctx.log, getJarDir());
+            if (html != null) ReportGenerator.open(html);
+        });
+        m.put("--history",          ctx -> SessionHistory.listSessions(ctx.log, getJarDir(), null));
+        m.put("--schedule-daily",   ctx -> {
+            String time = ctx.nextArgOr("03:00");
+            String ops  = ctx.nextArgOr("--quick");
+            AutoScheduler.scheduleDaily(ctx.log, getJarPath(), time, ops);
+        });
+        m.put("--schedule-weekly",  ctx -> {
+            String day  = ctx.nextArgAny("SUN");
+            String time = ctx.nextArgOr("03:00");
+            String ops  = ctx.nextArgOr("--quick");
+            AutoScheduler.scheduleWeekly(ctx.log, getJarPath(), day, time, ops);
+        });
+        m.put("--schedule-list",    ctx -> AutoScheduler.listSchedules(ctx.log));
+        m.put("--schedule-remove",  ctx -> AutoScheduler.removeSchedule(ctx.log, ctx.nextArgOr("all")));
+
+        return Collections.unmodifiableMap(m);
+    }
+
     public static void main(String[] args) throws Exception {
         if (!System.getProperty("os.name", "").toLowerCase().contains("windows")) {
             System.out.println("[ERRO] TrashCleaner e exclusivo para Windows.");
@@ -127,9 +347,9 @@ public final class TrashCleaner {
         // Processar flags globais antes de qualquer outra coisa
         boolean hasDryRun = false, hasSilent = false;
         for (String a : args) {
-            if (a.equals("--dry-run"))   { hasDryRun = true;  Config.dryRun  = true; }
-            if (a.equals("--silent"))    { hasSilent = true;  Config.silent  = true; }
-            if (a.equals("--no-progress")) Config.showProgress = false;
+            if (a.equals("--dry-run"))   { hasDryRun = true;  Config.setDryRun(true); }
+            if (a.equals("--silent"))    { hasSilent = true;  Config.setSilent(true); }
+            if (a.equals("--no-progress")) Config.setShowProgress(false);
         }
 
         SystemInfo si  = new SystemInfo();
@@ -141,7 +361,7 @@ public final class TrashCleaner {
         long initRam  = getAvailableRam(si);
         Config.startSession(initFree, initRam);
 
-        if (Config.dryRun) {
+        if (Config.isDryRun()) {
             log.warn("MODO SIMULACAO ATIVO — nenhuma operacao sera executada de fato.");
             log.println("");
         }
@@ -151,13 +371,13 @@ public final class TrashCleaner {
             if (a.equals("--help") || a.equals("-h")) { printHelp(); log.close(); return; }
         }
 
-        if (!si.admin && !Config.dryRun) {
+        if (!si.admin && !Config.isDryRun()) {
             log.warn("Execute como Administrador para acesso completo!");
             log.println("");
             log.println("  Clique com o botao direito em run.bat");
             log.println("  e selecione 'Executar como administrador'.");
             log.println("");
-            if (!Config.silent) {
+            if (!Config.isSilent()) {
                 log.println("  Pressione ENTER para continuar mesmo assim...");
                 System.in.read();
             }
@@ -178,227 +398,24 @@ public final class TrashCleaner {
     // ---------------------------------------------------------------
 
     private static void runCLI(String[] args, SystemInfo si, Logger log) {
-        long before = Utils.getDiskFree(si.systemDrive);
+        long before   = Utils.getDiskFree(si.systemDrive);
         boolean didWork = false;
 
-        for (int i = 0; i < args.length; i++) {
-            String arg = args[i].toLowerCase();
+        CliContext ctx = new CliContext(args, si, log);
+        while (ctx.hasNext()) {
+            String arg = ctx.next().toLowerCase();
 
-            // flags globais ja processadas
             if (arg.equals("--dry-run") || arg.equals("--silent") ||
                 arg.equals("--no-progress")) continue;
 
-            didWork = true;
-
-            switch (arg) {
-                // LIMPEZA
-                case "--quick": case "-q":   Cleaner.quickClean(si, log); break;
-                case "--deep":  case "-d":   Cleaner.deepClean(si, log);  break;
-                case "--apps":               Cleaner.cleanAppCache(si, log); break;
-                case "--shadows-old":        Cleaner.cleanShadowCopies(si, log); break;
-                case "--shadows-all":        DiskAnalyzer.deleteShadowCopies(si, log, false); break;
-                case "--winsxs":             Cleaner.cleanWinSxS(si, log); break;
-                case "--lang-packs":         Cleaner.cleanLanguagePacks(si, log); break;
-                case "--all": case "-a":
-                    Cleaner.deepClean(si, log);
-                    Cleaner.cleanAppCache(si, log);
-                    Optimizer.optimizeSystem(si, log);
-                    Optimizer.optimizeNetwork(si, log);
-                    PrivacyOptimizer.applyAll(si, log);
-                    break;
-
-                // OTIMIZACAO
-                case "--optimize": case "-s":  Optimizer.optimizeSystem(si, log);  break;
-                case "--network":  case "-n":  Optimizer.optimizeNetwork(si, log); break;
-                case "--privacy":              PrivacyOptimizer.applyPrivacy(si, log); break;
-                case "--performance":          PrivacyOptimizer.applyPerformance(si, log); break;
-                case "--tweaks":               PrivacyOptimizer.applyAll(si, log); break;
-                case "--sounds-off":           Optimizer.disableSystemSounds(log); break;
-                case "--search-rebuild":       Optimizer.rebuildSearchIndex(si, log); break;
-                case "--write-cache":          Optimizer.optimizeWriteCache(si, log); break;
-                case "--winupdate-repair":     Optimizer.repairWindowsUpdate(si, log); break;
-                case "--dotnet-repair":        Optimizer.repairDotNet(si, log); break;
-                case "--pagefile-auto":
-                    Optimizer.configurePagefile(si, log, "auto", 0, 0); break;
-                case "--pagefile-off":
-                    Optimizer.configurePagefile(si, log, "off", 0, 0); break;
-                case "--pagefile-custom":
-                    long minMb = 1024, maxMb = 4096;
-                    if (i+1 < args.length && args[i+1].contains(",")) {
-                        String[] mm = args[++i].split(",");
-                        try { minMb = Long.parseLong(mm[0].trim()); } catch (Exception ignored) {}
-                        try { maxMb = Long.parseLong(mm[1].trim()); } catch (Exception ignored) {}
-                    }
-                    Optimizer.configurePagefile(si, log, "custom", minMb, maxMb);
-                    break;
-
-                // SISTEMA
-                case "--check": case "-c":     SystemChecker.check(si, log); break;
-                case "--info":  case "-i":     SystemInfoDisplay.show(si, log); break;
-                case "--programs":             SystemInfoDisplay.showPrograms(si, log); break;
-                case "--drivers":              SystemInfoDisplay.showDrivers(si, log); break;
-                case "--updates":              SystemInfoDisplay.showUpdates(si, log); break;
-                case "--startup":              StartupManager.listStartup(si, log); break;
-                case "--services":             ServiceManager.listServices(log, ""); break;
-                case "--services-gaming":      ServiceManager.applyGamingProfile(log); break;
-                case "--services-min":         ServiceManager.applyMinimalProfile(log); break;
-                case "--services-restart":     ServiceManager.restartCritical(log); break;
-                case "--tasks-list":           ScheduledTaskManager.listTasks(log, "telemetry"); break;
-                case "--tasks-disable":        ScheduledTaskManager.disableTelemetryTasks(log); break;
-                case "--tasks-enable":         ScheduledTaskManager.enableTelemetryTasks(log); break;
-                case "--boot-diag":            ScheduledTaskManager.bootDiagnostic(si, log); break;
-
-                // DISCO
-                case "--disk-health":          SystemTools.checkDiskHealth(si, log); break;
-                case "--disk-top": {
-                    int n = 20;
-                    if (i+1 < args.length && args[i+1].matches("\\d+")) n = Integer.parseInt(args[++i]);
-                    DiskAnalyzer.topFolders(log, si.systemDrive, n);
-                    break;
-                }
-                case "--disk-large": {
-                    long mb = 100;
-                    if (i+1 < args.length && args[i+1].matches("\\d+")) mb = Long.parseLong(args[++i]);
-                    DiskAnalyzer.findLargeFiles(log, si.systemDrive, mb, 50);
-                    break;
-                }
-                case "--disk-dupes": {
-                    String path = si.userProfile;
-                    if (i+1 < args.length && !args[i+1].startsWith("-")) path = args[++i];
-                    DiskAnalyzer.findDuplicates(log, path);
-                    break;
-                }
-                case "--disk-frag": {
-                    String drive = si.systemDrive;
-                    if (i+1 < args.length && args[i+1].matches("[A-Za-z]:")) drive = args[++i];
-                    DiskAnalyzer.checkFragmentation(si, log, drive);
-                    break;
-                }
-                case "--chkdsk": {
-                    String drive = si.systemDrive;
-                    if (i+1 < args.length && args[i+1].matches("[A-Za-z]:")) drive = args[++i];
-                    DiskAnalyzer.scheduleChkdsk(log, drive);
-                    break;
-                }
-                case "--shadows-list":         DiskAnalyzer.listShadowCopies(si, log); break;
-                case "--ntfs-compress": {
-                    String path = i+1 < args.length && !args[i+1].startsWith("-") ?
-                        args[++i] : si.userProfile;
-                    DiskAnalyzer.compressFolder(log, path);
-                    break;
-                }
-                case "--backup": {
-                    String src = i+1 < args.length ? args[++i] : si.userProfile;
-                    String dst = i+1 < args.length ? args[++i] : getJarDir() + "backup\\";
-                    DiskAnalyzer.backupFiles(log, new String[]{src}, dst);
-                    break;
-                }
-
-                // REDE AVANCADA
-                case "--net-test":             NetworkTools.testConnectivity(log); break;
-                case "--net-connections":      NetworkTools.listConnections(log); break;
-                case "--net-ports":            NetworkTools.listOpenPorts(log); break;
-                case "--net-dns-set": {
-                    String provider = i+1 < args.length && !args[i+1].startsWith("-") ?
-                        args[++i] : "cloudflare";
-                    NetworkTools.configureDns(si, log, provider);
-                    break;
-                }
-                case "--net-wifi":             NetworkTools.manageWifiProfiles(log, null); break;
-                case "--net-adapters":         NetworkTools.manageAdapters(log, null); break;
-                case "--net-proxy-reset":      NetworkTools.resetProxy(log); break;
-                case "--net-trace": {
-                    String host = i+1 < args.length && !args[i+1].startsWith("-") ?
-                        args[++i] : "google.com";
-                    NetworkTools.traceroute(log, host);
-                    break;
-                }
-                case "--net-info":             NetworkTools.showNetInfo(log); break;
-
-                // SEGURANCA
-                case "--firewall":             SecurityTools.manageFirewall(si, log, null); break;
-                case "--defender-scan":        SecurityTools.defenderScan(si, log); break;
-                case "--credentials":          SecurityTools.manageCredentials(log, null); break;
-                case "--users":                SecurityTools.listUsers(log); break;
-                case "--check-updates":        SecurityTools.checkUpdates(si, log); break;
-                case "--bsod-history":         SecurityTools.showBsodHistory(si, log); break;
-                case "--processes":            SecurityTools.listProcesses(si, log); break;
-                case "--secure-boot":          SecurityTools.checkSecureBoot(si, log); break;
-                case "--driver-check":         SecurityTools.checkDrivers(si, log); break;
-
-                // RECUPERACAO
-                case "--restore-list":         RecoveryTools.listRestorePoints(si, log); break;
-                case "--restore-point":        SystemTools.createRestorePoint(si, log); break;
-                case "--restore-apply": {
-                    int seqNo = 1;
-                    if (i+1 < args.length && args[i+1].matches("\\d+"))
-                        seqNo = Integer.parseInt(args[++i]);
-                    RecoveryTools.applyRestorePoint(si, log, seqNo);
-                    break;
-                }
-                case "--mbr-repair": {
-                    String mode = i+1 < args.length && !args[i+1].startsWith("-") ?
-                        args[++i] : "all";
-                    RecoveryTools.repairBoot(si, log, mode);
-                    break;
-                }
-                case "--perms": {
-                    String path = i+1 < args.length && !args[i+1].startsWith("-") ?
-                        args[++i] : null;
-                    RecoveryTools.repairPermissions(si, log, path);
-                    break;
-                }
-                case "--file-assoc":           RecoveryTools.repairFileAssociations(si, log); break;
-                case "--dotnet-check":         RecoveryTools.checkDotNet(si, log); break;
-
-                // FERRAMENTAS
-                case "--ram":                  SystemTools.flushRam(si, log); break;
-                case "--battery":              SystemTools.batteryReport(log, getJarDir()); break;
-                case "--clipboard":            SystemTools.clearClipboard(si, log); break;
-                case "--hibernate-on":         SystemTools.setHibernation(log, true); break;
-                case "--hibernate-off":        SystemTools.setHibernation(log, false); break;
-                case "--reg-check":            SystemTools.checkRegistry(si, log); break;
-
-                // RELATORIOS / AUTOMACAO
-                case "--report-html": {
-                    Config.endSession(Utils.getDiskFree(si.systemDrive), getAvailableRam(si));
-                    String htmlPath = ReportGenerator.generate(si, log, getJarDir());
-                    if (htmlPath != null) ReportGenerator.open(htmlPath);
-                    break;
-                }
-                case "--history":
-                    SessionHistory.listSessions(log, getJarDir(), null);
-                    break;
-                case "--schedule-daily": {
-                    String time = i+1 < args.length && !args[i+1].startsWith("-") ?
-                        args[++i] : "03:00";
-                    String ops  = i+1 < args.length && !args[i+1].startsWith("-") ?
-                        args[++i] : "--quick";
-                    AutoScheduler.scheduleDaily(log, getJarPath(), time, ops);
-                    break;
-                }
-                case "--schedule-weekly": {
-                    String day  = i+1 < args.length ? args[++i] : "SUN";
-                    String time = i+1 < args.length && !args[i+1].startsWith("-") ?
-                        args[++i] : "03:00";
-                    String ops  = i+1 < args.length && !args[i+1].startsWith("-") ?
-                        args[++i] : "--quick";
-                    AutoScheduler.scheduleWeekly(log, getJarPath(), day, time, ops);
-                    break;
-                }
-                case "--schedule-list":        AutoScheduler.listSchedules(log); break;
-                case "--schedule-remove": {
-                    String type = i+1 < args.length && !args[i+1].startsWith("-") ?
-                        args[++i] : "all";
-                    AutoScheduler.removeSchedule(log, type);
-                    break;
-                }
-
-                default:
-                    log.warn("Opcao desconhecida: " + arg);
-                    printHelp();
-                    return;
+            CliHandler handler = CLI_COMMANDS.get(arg);
+            if (handler == null) {
+                log.warn("Opcao desconhecida: " + arg);
+                printHelp();
+                return;
             }
+            didWork = true;
+            handler.handle(ctx);
         }
 
         if (didWork) {
@@ -833,7 +850,7 @@ public final class TrashCleaner {
         long after = Utils.getDiskFree(si.systemDrive);
         long ram   = getAvailableRam(si);
         Config.endSession(after, ram);
-        log.showComparison(before, after, Config.sessionStartRam, ram);
+        log.showComparison(before, after, Config.getSessionStartRam(), ram);
 
         // Gerar relatorio HTML automaticamente
         String htmlPath = ReportGenerator.generate(si, log, getJarDir());
@@ -846,7 +863,7 @@ public final class TrashCleaner {
         log.println("  " + rep('=', 60));
         log.println("");
 
-        if (!Config.silent) {
+        if (!Config.isSilent()) {
             System.out.print("  Abrir relatorio HTML? [S]: ");
             if ("S".equalsIgnoreCase(sc.nextLine().trim()) && htmlPath != null) {
                 ReportGenerator.open(htmlPath);
@@ -1020,7 +1037,7 @@ public final class TrashCleaner {
             " (" + si.winMajor + "." + si.winMinor + "." + si.winBuild + ")");
         log.log(" Maquina   : " + si.computerName + " / " + si.userName);
         log.log(" Data      : " + new SimpleDateFormat("dd/MM/yyyy HH:mm:ss").format(new Date()));
-        log.log(" Dry-run   : " + Config.dryRun);
+        log.log(" Dry-run   : " + Config.isDryRun());
         log.log(" Admin     : " + si.admin);
         log.log(rep('=', 60));
         log.log("Espaco livre ANTES: " + Logger.fmt(Utils.getDiskFree(si.systemDrive)));

@@ -5,7 +5,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 /**
  * Utilitarios compartilhados: execucao de processos, manipulacao de
  * arquivos e operacoes de registro.
- * Suporte a modo dry-run via Config.dryRun.
+ * Suporte a modo dry-run via Config.isDryRun().
  */
 public final class Utils {
 
@@ -17,7 +17,7 @@ public final class Utils {
 
     /** Executa um comando e aguarda termino. Retorna o exit code. */
     public static int exec(String... cmd) {
-        if (Config.dryRun) {
+        if (Config.isDryRun()) {
             System.out.println("  [SIMULACAO] " + String.join(" ", cmd));
             return 0;
         }
@@ -38,7 +38,7 @@ public final class Utils {
      * Usado para comandos cujo output o usuario precisa ver.
      */
     public static int execPrint(String... cmd) {
-        if (Config.dryRun) {
+        if (Config.isDryRun()) {
             System.out.println("  [SIMULACAO] " + String.join(" ", cmd));
             return 0;
         }
@@ -64,7 +64,7 @@ public final class Utils {
      * Util para capturar resultados de comandos.
      */
     public static String execCapture(String... cmd) {
-        if (Config.dryRun) return "";
+        if (Config.isDryRun()) return "";
         try {
             Process p = new ProcessBuilder(cmd)
                 .redirectErrorStream(true)
@@ -107,7 +107,7 @@ public final class Utils {
      */
     public static long wipeDir(File dir) {
         if (dir == null || !dir.exists() || !dir.isDirectory()) return 0L;
-        if (Config.dryRun) return calcDirSize(dir);
+        if (Config.isDryRun()) return calcDirSize(dir);
 
         long freed = 0L;
         File[] files = dir.listFiles();
@@ -153,7 +153,7 @@ public final class Utils {
         File[] matches = dir.listFiles((d, name) -> name.matches(regex));
         if (matches == null) return;
         for (File f : matches) {
-            if (Config.dryRun) {
+            if (Config.isDryRun()) {
                 System.out.println("  [SIMULACAO] delete " + f.getAbsolutePath());
                 continue;
             }
@@ -180,7 +180,7 @@ public final class Utils {
     /** Copia um arquivo de src para dst, criando diretorios intermediarios. */
     public static boolean copyFile(File src, File dst) {
         if (!src.exists() || !src.isFile()) return false;
-        if (Config.dryRun) {
+        if (Config.isDryRun()) {
             System.out.println("  [SIMULACAO] copy " + src + " -> " + dst);
             return true;
         }
@@ -220,45 +220,6 @@ public final class Utils {
     /** Retorna o espaco total do drive informado. */
     public static long getDiskTotal(String drive) {
         return new File(drive + "\\").getTotalSpace();
-    }
-
-    // ---------------------------------------------------------------
-    // Registro do Windows
-    // ---------------------------------------------------------------
-
-    /** Adiciona ou atualiza um valor no Registro. */
-    public static void reg(String key, String name, String type, String value) {
-        exec("reg", "add", key, "/v", name, "/t", type, "/d", value, "/f");
-    }
-
-    /** Remove uma chave inteira do Registro. */
-    public static void regDelete(String key) {
-        exec("reg", "delete", key, "/f");
-    }
-
-    /** Remove um valor especifico do Registro. */
-    public static void regDeleteValue(String key, String name) {
-        exec("reg", "delete", key, "/v", name, "/f");
-    }
-
-    /** Consulta um valor do Registro e retorna como String, ou null se nao encontrado. */
-    public static String regQuery(String key, String name) {
-        try {
-            Process p = new ProcessBuilder("reg", "query", key, "/v", name)
-                .redirectErrorStream(true).start();
-            BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
-            String line;
-            while ((line = br.readLine()) != null) {
-                line = line.trim();
-                String[] parts = line.split("\\s{2,}", 3);
-                if (parts.length == 3 && parts[0].trim().equalsIgnoreCase(name)) {
-                    p.waitFor();
-                    return parts[2].trim();
-                }
-            }
-            p.waitFor();
-        } catch (Exception ignored) {}
-        return null;
     }
 
     // ---------------------------------------------------------------
