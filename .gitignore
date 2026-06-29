@@ -1,4 +1,4 @@
-# Build artifacts
+# Build artifacts e saida de compilacao (fontes + testes)
 out/
 *.class
 TrashCleaner.jar
