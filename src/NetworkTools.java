@@ -162,10 +162,16 @@ public final class NetworkTools {
                 restoreDnsAuto(log);
                 return;
             default:
-                // Permitir DNS customizado "1.2.3.4"
+                // Permitir DNS customizado "1.2.3.4" ou "1.2.3.4,5.6.7.8"
                 String[] parts = provider.split(",");
                 primary   = parts[0].trim();
                 secondary = parts.length > 1 ? parts[1].trim() : "8.8.8.8";
+                if (!isValidIp(primary) || !isValidIp(secondary)) {
+                    log.warn("Endereco IP invalido: '" + provider + "'");
+                    log.println("  Use o formato: 1.2.3.4  ou  1.2.3.4,5.6.7.8");
+                    log.println("  Alternativas: google / cloudflare / opendns / quad9 / auto");
+                    return;
+                }
         }
 
         log.println("  Servidor primario  : " + primary);
@@ -446,5 +452,21 @@ public final class NetworkTools {
         StringBuilder sb = new StringBuilder(n);
         for (int i = 0; i < n; i++) sb.append(c);
         return sb.toString();
+    }
+
+    // Valida formato de IPv4 (nao verifica faixas reservadas — apenas sintaxe)
+    static boolean isValidIp(String ip) {
+        if (ip == null || ip.isEmpty()) return false;
+        String[] octets = ip.split("\\.", -1);
+        if (octets.length != 4) return false;
+        for (String oct : octets) {
+            try {
+                int v = Integer.parseInt(oct);
+                if (v < 0 || v > 255) return false;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        return true;
     }
 }

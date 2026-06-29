@@ -20,6 +20,12 @@ public final class AutoScheduler {
 
     public static void scheduleDaily(Logger log, String jarPath, String time, String args) {
         log.section("AGENDAR LIMPEZA DIARIA");
+
+        if (!isValidTime(time)) {
+            log.warn("Horario invalido: '" + time + "'. Use o formato HH:MM (ex: 03:00).");
+            return;
+        }
+
         log.println("  JAR     : " + jarPath);
         log.println("  Horario : " + time);
         log.println("  Operacao: java -jar TrashCleaner.jar " + args);
@@ -57,6 +63,16 @@ public final class AutoScheduler {
     public static void scheduleWeekly(Logger log, String jarPath, String dayOfWeek,
         String time, String args) {
         log.section("AGENDAR LIMPEZA SEMANAL");
+
+        if (!isValidDay(dayOfWeek)) {
+            log.warn("Dia da semana invalido: '" + dayOfWeek + "'. Use: MON/TUE/WED/THU/FRI/SAT/SUN.");
+            return;
+        }
+        if (!isValidTime(time)) {
+            log.warn("Horario invalido: '" + time + "'. Use o formato HH:MM (ex: 03:00).");
+            return;
+        }
+
         log.println("  JAR     : " + jarPath);
         log.println("  Dia     : " + dayOfWeek);
         log.println("  Horario : " + time);
@@ -185,6 +201,25 @@ public final class AutoScheduler {
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
+
+    /** Valida formato HH:MM (00:00 – 23:59). */
+    static boolean isValidTime(String time) {
+        if (time == null || !time.matches("\\d{2}:\\d{2}")) return false;
+        String[] parts = time.split(":");
+        int h = Integer.parseInt(parts[0]);
+        int m = Integer.parseInt(parts[1]);
+        return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+    }
+
+    /** Valida abreviacao de dia da semana aceita pelo schtasks. */
+    static boolean isValidDay(String day) {
+        if (day == null) return false;
+        switch (day.toUpperCase()) {
+            case "MON": case "TUE": case "WED": case "THU":
+            case "FRI": case "SAT": case "SUN": return true;
+            default: return false;
+        }
+    }
 
     private static void deleteTask(String taskName) {
         Utils.exec("schtasks", "/delete", "/tn", taskName, "/f");

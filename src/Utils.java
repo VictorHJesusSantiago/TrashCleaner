@@ -28,6 +28,7 @@ public final class Utils {
             drain(p.getInputStream());
             return p.waitFor();
         } catch (Exception e) {
+            System.err.println("  [exec falhou] " + String.join(" ", cmd) + " : " + e.getMessage());
             return -1;
         }
     }
@@ -53,6 +54,7 @@ public final class Utils {
             }
             return p.waitFor();
         } catch (Exception e) {
+            System.err.println("  [exec falhou] " + String.join(" ", cmd) + " : " + e.getMessage());
             return -1;
         }
     }
@@ -77,6 +79,7 @@ public final class Utils {
             p.waitFor();
             return sb.toString();
         } catch (Exception e) {
+            System.err.println("  [exec falhou] " + String.join(" ", cmd) + " : " + e.getMessage());
             return "";
         }
     }
