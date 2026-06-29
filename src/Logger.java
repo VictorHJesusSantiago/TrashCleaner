@@ -1,6 +1,7 @@
 import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Locale;
 
 /**
  * Logger duplo: escreve no console e em arquivo .log simultaneamente.
@@ -19,9 +20,11 @@ public final class Logger {
     private static final String MGN = ESC + "[35m";
 
     private final PrintWriter file;
+    private final PrintWriter jsonFile; // JSON Lines: um objeto JSON por linha de log
     private final boolean ansi;
     private final String logPath;
-    private final SimpleDateFormat sdf = new SimpleDateFormat("HH:mm:ss");
+    private final SimpleDateFormat sdf     = new SimpleDateFormat("HH:mm:ss");
+    private final SimpleDateFormat isoSdf  = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 
     /** Se true, a proxima chamada a qualquer metodo de saida deve limpar a linha de progresso. */
     private boolean progressActive = false;
@@ -29,13 +32,15 @@ public final class Logger {
     public Logger(String logPath, boolean ansi) {
         this.logPath = logPath;
         this.ansi    = ansi;
-        PrintWriter pw = null;
+        PrintWriter pw = null, jw = null;
         try {
             pw = new PrintWriter(new BufferedWriter(new FileWriter(logPath)));
+            jw = new PrintWriter(new BufferedWriter(new FileWriter(logPath + ".jsonl")));
         } catch (IOException e) {
             System.err.println("[AVISO] Nao foi possivel criar o log: " + e.getMessage());
         }
-        this.file = pw;
+        this.file     = pw;
+        this.jsonFile = jw;
     }
 
     // ---------------------------------------------------------------
@@ -85,10 +90,31 @@ public final class Logger {
     }
 
     public void log(String msg) {
+        Date now = new Date();
         if (file != null) {
-            file.println(sdf.format(new Date()) + "  " + msg);
+            file.println(sdf.format(now) + "  " + msg);
             file.flush();
         }
+        if (jsonFile != null) {
+            jsonFile.println(jsonLine(now, deriveLevel(msg), msg));
+            jsonFile.flush();
+        }
+    }
+
+    private static String deriveLevel(String msg) {
+        if (msg.startsWith("[OK]"))    return "OK";
+        if (msg.startsWith("[AVISO]")) return "WARN";
+        if (msg.startsWith("[INFO]"))  return "INFO";
+        if (msg.startsWith("==="))     return "SECTION";
+        return "DEBUG";
+    }
+
+    private String jsonLine(Date ts, String level, String msg) {
+        String escaped = msg.replace("\\", "\\\\").replace("\"", "\\\"")
+                            .replace("\n", "\\n").replace("\r", "");
+        return String.format(Locale.ROOT,
+            "{\"ts\":\"%s\",\"level\":\"%s\",\"msg\":\"%s\"}",
+            isoSdf.format(ts), level, escaped);
     }
 
     // ---------------------------------------------------------------
@@ -102,7 +128,7 @@ public final class Logger {
      * @param pct   0-100
      */
     public void progress(String task, int pct) {
-        if (!Config.showProgress) return;
+        if (!Config.isShowProgress()) return;
         pct = Math.max(0, Math.min(100, pct));
         int width  = 28;
         int filled = (pct * width) / 100;
@@ -186,7 +212,7 @@ public final class Logger {
         rawPrintln("  " + rep('-', 62));
         long elapsed = Config.elapsedSeconds();
         rawPrintln("   Tempo de sessao : " + elapsed + " segundos");
-        rawPrintln("   Operacoes       : " + Config.sessionOps.size());
+        rawPrintln("   Operacoes       : " + Config.sessionOpCount());
         rawPrintln("  " + rep('=', 62));
         log("Comparativo - Disco liberado: " + fmt(Math.max(0, diskDiff))
             + " | RAM liberada: " + fmt(Math.max(0, ramAfter - ramBefore)));
@@ -196,7 +222,8 @@ public final class Logger {
 
     public void close() {
         progressDone();
-        if (file != null) file.close();
+        if (file     != null) file.close();
+        if (jsonFile != null) jsonFile.close();
     }
 
     // ---------------------------------------------------------------

@@ -304,7 +304,7 @@ public final class DiskAnalyzer {
         log.println("");
 
         File dest = new File(destDir);
-        if (!Config.dryRun) dest.mkdirs();
+        if (!Config.isDryRun()) dest.mkdirs();
 
         String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new java.util.Date());
         long total = 0L;

@@ -285,7 +285,7 @@ public final class NetworkTools {
         log.println("  [0] Cancelar");
         log.println("");
 
-        if (!Config.silent && sc != null) {
+        if (!Config.isSilent() && sc != null) {
             System.out.print("  Escolha: ");
             String choice = sc.nextLine().trim();
 
@@ -322,7 +322,7 @@ public final class NetworkTools {
         Utils.execPrint("netsh", "interface", "show", "interface");
         log.println("");
 
-        if (!Config.silent && sc != null) {
+        if (!Config.isSilent() && sc != null) {
             log.println("  Opcoes:");
             log.println("  [1] Desabilitar adaptador por nome");
             log.println("  [2] Habilitar adaptador por nome");
@@ -359,15 +359,15 @@ public final class NetworkTools {
         Utils.exec("netsh", "winhttp", "reset", "proxy");
 
         log.info("Desabilitando proxy no registro (IE/sistema)...");
-        Utils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
+        RegistryUtils.reg("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
             "ProxyEnable", "REG_DWORD", "0");
-        Utils.regDeleteValue("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
+        RegistryUtils.regDeleteValue("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
             "ProxyServer");
-        Utils.regDeleteValue("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
+        RegistryUtils.regDeleteValue("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
             "ProxyOverride");
 
         log.info("Limpando PAC automático...");
-        Utils.regDeleteValue("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
+        RegistryUtils.regDeleteValue("HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings",
             "AutoConfigURL");
 
         Utils.exec("ipconfig", "/flushdns");
